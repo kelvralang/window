@@ -14,7 +14,7 @@ dependencies = []
 
 [native]
 build = "cmake"
-targets = ["linux-x86_64-gnu", "linux-arm64-gnu", "macos-arm64", "macos-x86_64"]
+targets = ["linux-x86_64-gnu", "linux-arm64-gnu", "macos-arm64"]
 
 [system-dependencies]
 sdl2 = { version = ">=2.0.0", required = true }
