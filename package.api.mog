@@ -29,8 +29,11 @@ fn show(win Window) void
 @doc("Hide a window.")
 fn hide(win Window) void
 
-@doc("Poll the next pending SDL event.")
+@doc("Poll the next event from SDL's process-wide queue. Use eventWindowId to route multi-window events.")
 fn pollEvent(win Window) Event?
+
+@doc("Return SDL's stable numeric identifier for a window.")
+fn windowId(win Window) i64
 
 @doc("Return the event kind string.")
 fn eventKind(evt Event) str
@@ -38,13 +41,16 @@ fn eventKind(evt Event) str
 @doc("Return the key code associated with a key event.")
 fn eventKeyCode(evt Event) i64
 
+@doc("Return the originating SDL window ID, or 0 for process-wide events.")
+fn eventWindowId(evt Event) i64
+
 @doc("Check whether a key is currently held.")
 fn isKeyDown(win Window, keyCode i64) bool
 
-@doc("Return the current mouse X position.")
+@doc("Return the current mouse X position relative to the supplied window.")
 fn mouseX(win Window) i64
 
-@doc("Return the current mouse Y position.")
+@doc("Return the current mouse Y position relative to the supplied window.")
 fn mouseY(win Window) i64
 
 @doc("Clear the backbuffer to black.")

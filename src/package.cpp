@@ -565,6 +565,27 @@ bool pollEvent(const ExprHostApi* hostApi, const ExprPackageValue* args,
     return true;
 }
 
+bool windowId(const ExprHostApi* hostApi, const ExprPackageValue* args, size_t argc,
+              ExprPackageValue* outResult, ExprPackageStringView* outError) {
+    (void)hostApi;
+    if (argc != 1 || args == nullptr || outResult == nullptr) {
+        setError(outError, "expected exactly 1 argument");
+        return false;
+    }
+    WindowHandle* windowHandle = nullptr;
+    if (!expectOpenWindowHandle(args[0], windowHandle, outError)) {
+        return false;
+    }
+    const uint32_t id = SDL_GetWindowID(windowHandle->window);
+    if (id == 0) {
+        setError(outError, SDL_GetError());
+        return false;
+    }
+    outResult->kind = EXPR_PACKAGE_VALUE_I64;
+    outResult->as.i64_value = static_cast<int64_t>(id);
+    return true;
+}
+
 bool eventKind(const ExprHostApi* hostApi, const ExprPackageValue* args,
                size_t argc, ExprPackageValue* outResult,
                ExprPackageStringView* outError) {
@@ -634,6 +655,46 @@ bool eventKeyCode(const ExprHostApi* hostApi, const ExprPackageValue* args,
     return true;
 }
 
+bool eventWindowId(const ExprHostApi* hostApi, const ExprPackageValue* args,
+                   size_t argc, ExprPackageValue* outResult,
+                   ExprPackageStringView* outError) {
+    (void)hostApi;
+    if (argc != 1 || args == nullptr || outResult == nullptr) {
+        setError(outError, "expected exactly 1 argument");
+        return false;
+    }
+    EventHandle* eventHandle = nullptr;
+    if (!expectEventHandle(args[0], eventHandle, outError)) {
+        return false;
+    }
+
+    uint32_t id = 0;
+    switch (eventHandle->event.type) {
+        case SDL_WINDOWEVENT:
+            id = eventHandle->event.window.windowID;
+            break;
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+            id = eventHandle->event.key.windowID;
+            break;
+        case SDL_MOUSEMOTION:
+            id = eventHandle->event.motion.windowID;
+            break;
+        case SDL_MOUSEBUTTONDOWN:
+        case SDL_MOUSEBUTTONUP:
+            id = eventHandle->event.button.windowID;
+            break;
+        case SDL_MOUSEWHEEL:
+            id = eventHandle->event.wheel.windowID;
+            break;
+        default:
+            break;
+    }
+    outResult->kind = EXPR_PACKAGE_VALUE_I64;
+    outResult->as.i64_value = static_cast<int64_t>(id);
+    return true;
+}
+
 bool isKeyDown(const ExprHostApi* hostApi, const ExprPackageValue* args,
                size_t argc, ExprPackageValue* outResult,
                ExprPackageStringView* outError) {
@@ -689,9 +750,12 @@ bool mouseX(const ExprHostApi* hostApi, const ExprPackageValue* args,
 
     int x = 0;
     int y = 0;
-    SDL_GetMouseState(&x, &y);
+    SDL_GetGlobalMouseState(&x, &y);
+    int windowX = 0;
+    int windowY = 0;
+    SDL_GetWindowPosition(windowHandle->window, &windowX, &windowY);
     outResult->kind = EXPR_PACKAGE_VALUE_I64;
-    outResult->as.i64_value = static_cast<int64_t>(x);
+    outResult->as.i64_value = static_cast<int64_t>(x - windowX);
     return true;
 }
 
@@ -712,9 +776,12 @@ bool mouseY(const ExprHostApi* hostApi, const ExprPackageValue* args,
 
     int x = 0;
     int y = 0;
-    SDL_GetMouseState(&x, &y);
+    SDL_GetGlobalMouseState(&x, &y);
+    int windowX = 0;
+    int windowY = 0;
+    SDL_GetWindowPosition(windowHandle->window, &windowX, &windowY);
     outResult->kind = EXPR_PACKAGE_VALUE_I64;
-    outResult->as.i64_value = static_cast<int64_t>(y);
+    outResult->as.i64_value = static_cast<int64_t>(y - windowY);
     return true;
 }
 
@@ -956,9 +1023,12 @@ constexpr ExprPackageFunctionExport kFunctions[] = {
     {"pollEvent",
      "fn(handle<github:window:WindowHandle>) -> handle<github:window:EventHandle>?",
      1, pollEvent},
+    {"windowId", "fn(handle<github:window:WindowHandle>) -> i64", 1, windowId},
     {"eventKind", "fn(handle<github:window:EventHandle>) -> str", 1, eventKind},
     {"eventKeyCode", "fn(handle<github:window:EventHandle>) -> i64", 1,
      eventKeyCode},
+    {"eventWindowId", "fn(handle<github:window:EventHandle>) -> i64", 1,
+     eventWindowId},
     {"isKeyDown", "fn(handle<github:window:WindowHandle>, i64) -> bool", 2,
      isKeyDown},
     {"mouseX", "fn(handle<github:window:WindowHandle>) -> i64", 1, mouseX},
@@ -980,15 +1050,27 @@ constexpr ExprPackageFunctionExport kFunctions[] = {
     {"delay", "fn(i64) -> void", 1, delayMs},
 };
 
-constexpr ExprPackageConstantExport kConstants[] = {
-    {"PACKAGE_ID",
-     "str",
-     {EXPR_PACKAGE_VALUE_STR, {.string_value = {"github.com/moglang/window", 25}}}},
-    {"KEY_ESCAPE", "i64", {EXPR_PACKAGE_VALUE_I64, {.i64_value = SDLK_ESCAPE}}},
-    {"KEY_SPACE", "i64", {EXPR_PACKAGE_VALUE_I64, {.i64_value = SDLK_SPACE}}},
+ExprPackageValue stringConstant(const char* text, size_t length) {
+    ExprPackageValue value{};
+    value.kind = EXPR_PACKAGE_VALUE_STR;
+    value.as.string_value = {text, length};
+    return value;
+}
+
+ExprPackageValue i64Constant(int64_t number) {
+    ExprPackageValue value{};
+    value.kind = EXPR_PACKAGE_VALUE_I64;
+    value.as.i64_value = number;
+    return value;
+}
+
+const ExprPackageConstantExport kConstants[] = {
+    {"PACKAGE_ID", "str", stringConstant("github.com/moglang/window", 25)},
+    {"KEY_ESCAPE", "i64", i64Constant(SDLK_ESCAPE)},
+    {"KEY_SPACE", "i64", i64Constant(SDLK_SPACE)},
 };
 
-constexpr ExprPackageRegistration kRegistration = {
+const ExprPackageRegistration kRegistration = {
     EXPR_NATIVE_PACKAGE_ABI_VERSION,
     "github",
     "window",
