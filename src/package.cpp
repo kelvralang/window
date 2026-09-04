@@ -1065,7 +1065,7 @@ ExprPackageValue i64Constant(int64_t number) {
 }
 
 const ExprPackageConstantExport kConstants[] = {
-    {"PACKAGE_ID", "str", stringConstant("github.com/moglang/window", 25)},
+    {"PACKAGE_ID", "str", stringConstant("github.com/kelvralang/window", 28)},
     {"KEY_ESCAPE", "i64", i64Constant(SDLK_ESCAPE)},
     {"KEY_SPACE", "i64", i64Constant(SDLK_SPACE)},
 };
